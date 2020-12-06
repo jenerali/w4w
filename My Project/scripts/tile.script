@@ -1,0 +1,126 @@
+local tileNum = hash("tileNum")
+local startGame = hash("startGame")
+local swap = hash("swap")
+local move = hash("move")
+local stop = hash("stop")
+local show = hash("show")
+local lightanim = {id = hash("lightSprite")}
+local blackanim = {id = hash("blackTile")}
+local valencianim = {id = hash("clueTile")}
+local flipVar = "A"
+
+local function flipBack()
+	go.set(".", "euler.y", 180)
+	go.animate(".", "euler.y", go.PLAYBACK_ONCE_FORWARD, 360, go.EASING_INELASTIC, 0.3)
+	label.set_text("#label", flipVar)
+	if flipVar == "blank" then
+		msg.post("#sprite", "play_animation",blackanim)
+		msg.post("#label", "disable")
+	else
+		msg.post("#sprite", "play_animation",lightanim)
+		msg.post("#label", "enable")
+	end
+end
+local function showClue(a,b)
+	go.set(".", "euler.y", 180)
+	go.animate(".", "euler.y", go.PLAYBACK_ONCE_FORWARD, 360, go.EASING_INELASTIC, 0.3)
+	msg.post("#sprite", "play_animation",valencianim)
+	label.set_text("#label", a)
+	if a == "blank" then
+		msg.post("#label", "disable")
+	else
+		msg.post("#label", "enable")
+	end
+	flipVar = b
+	timer.delay(5, false, flipBack)
+end
+
+function init(self)
+	self.num = 0
+	msg.post("#sprite", "disable")
+	msg.post("#label", "disable")
+end
+
+
+
+function on_message(self, message_id, message, sender)
+	if message_id == tileNum then
+		self.num = message.number
+	end
+
+	if message_id == startGame then
+		local num = self.num
+		if message.letters[1][num] then
+			msg.post("#label", "enable")
+			msg.post("#sprite", "enable")
+			label.set_text("#label", (message.letters[1][num]))
+			if message.letters[2][1]==num or message.letters[2][2]==num then
+				go.animate("#label", "color.w", go.PLAYBACK_LOOP_PINGPONG, 0, go.EASING_LINEAR, 2.5)
+				
+			end
+			if message.letters[1][num]=="blank" then
+				msg.post("#sprite", "play_animation",blackanim)
+				msg.post("#label", "disable")
+			end
+		else
+			msg.post(".", "disable")
+		end
+	end
+
+	if message_id == move then
+		local num = self.num
+		if message.newBlink[1]==num or message.newBlink[2]==num then
+			go.set("#label","color.w",1)
+			go.animate("#label", "color.w", go.PLAYBACK_LOOP_PINGPONG, 0, go.EASING_LINEAR, 2.5)
+		end
+	end
+
+	if message_id == stop then
+		local num = self.num
+		if message.oldBlink[1]==num or message.oldBlink[2]==num then
+			go.cancel_animations("#label","color")
+			go.set("#label","color.w",1)
+		end
+	end
+
+	if message_id == show then
+		if message.info[3] == self.num then
+			local pos = self.num
+			local current =  message.info[1][pos]
+			local sol =  message.info[2][pos]
+			showClue(sol, current)		
+		end
+	end
+	
+	if message_id == swap then
+		local num = self.num
+		local a=message.flip[2][1]
+		local b=message.flip[2][2]
+		if a==num then
+			go.set(".", "euler.y", 180)
+			go.animate(".", "euler.y", go.PLAYBACK_ONCE_FORWARD, 360, go.EASING_INELASTIC, 0.3)
+			label.set_text("#label", (message.flip[1][a])) 
+			if message.flip[1][a]=="blank" then
+				msg.post("#sprite", "play_animation",blackanim)
+				msg.post("#label", "disable")
+			else
+				msg.post("#sprite", "play_animation",lightanim)
+				msg.post("#label", "enable")
+			end
+		elseif b==num then
+			go.set(".", "euler.y", 180)
+			go.animate(".", "euler.y", go.PLAYBACK_ONCE_FORWARD, 360, go.EASING_INELASTIC, 0.3)
+			label.set_text("#label", (message.flip[1][b]))
+			if message.flip[1][b]=="blank" then
+				msg.post("#sprite", "play_animation",blackanim)
+				msg.post("#label", "disable")
+			else
+				msg.post("#sprite", "play_animation",lightanim)
+				msg.post("#label", "enable")
+			end	
+		end
+	end
+end
+
+
+

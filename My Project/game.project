@@ -1,0 +1,23 @@
+[bootstrap]
+main_collection = /main/main.collectionc
+
+[script]
+shared_state = 1
+
+[display]
+width = 1080
+height = 1920
+vsync = 0
+
+[android]
+input_method = HiddenInputField
+
+[project]
+title = Word 4 Word
+
+[label]
+max_count = 128
+
+[render]
+clear_color_alpha = 1.0
+
