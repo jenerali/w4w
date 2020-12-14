@@ -1,3 +1,4 @@
+local zjson = require "fbinstant.utils.json"
 local input_up = hash("move_up")
 local input_down = hash("move_down")
 local input_left = hash("move_left")
@@ -13,10 +14,15 @@ local soundOn = hash("soundOn")
 local soundOff = hash("soundOff")
 local startSound = hash("startSound")
 local buttonSound = hash("buttonSound")
+local playFlipSound = hash("playFlipSound")
 local retry = hash("retry")
+local share = hash("share")
+local next = hash("next")
 local ids = {}
 local sol = {}
+local nextSol = {}
 local currentBoard = {}
+local nextBoard = {}
 local blinkyPos = {}
 blinkyPos[1] = 111
 local startGrid = {}
@@ -26,6 +32,17 @@ local horizontal =true
 local vertical = false
 local recursed = false
 local currentLevel = 1
+local noLevel = false
+local noConnection = false
+local yesConnection = false
+local nextLevelReady = false
+local pause = 0
+local canShow = false
+local canLoad = true
+local level_placement = "426559372102433_446324906792546"
+local ad_id1 = " "
+local apis_json = fbinstant.get_supported_apis()
+local apis = json.decode(apis_json)
 
 
 
@@ -188,37 +205,7 @@ local function tablesEquivalent(a,b)
 	return equivalent
 end
 
-local function flip()
-	local swapInfo={}
-	swapInfo[1]=currentBoard
-	swapInfo[2]=blinkyPos	
 
-	local a = currentBoard[blinkyPos[1]]
-	local b = currentBoard[blinkyPos[2]] 
-
-	currentBoard[blinkyPos[1]] = b
-	currentBoard[blinkyPos[2]] = a
-
-	--ipairs breaks at nil
-	for i,id in ipairs(ids) do	
-		msg.post(id, "swap", {flip = swapInfo})	
-	end
-	
-	if currentLevel == 1 then
-		msg.post("graphics", "handOff")	
-	end
-
-	if tablesEquivalent(currentBoard,sol) then
-		msg.post("graphics","levelOver", {level = tostring(currentLevel)})
-		for i,id in ipairs(ids) do	
-			msg.post(id, "stop", {oldBlink = blinkyPos})	
-		end
-		msg.post("controller#complete", "play_sound")
-	else
-		msg.post("controller#flip", "play_sound")
-	end
-																		pprint(currentBoard)
-end
 
 local function moveUp()
 	recursed=false
@@ -394,18 +381,122 @@ local function moveLeft()
 	end
 end
 
-local function handle_response(self, id, response)
+
+local function next_response(self, id, response)
 	if response.status == 0 then
-		msg.post("graphics", "noConnection")
+		nextLevelReady = true	
 	end	
 	local wData = json.decode(response.response)
-	if wData.error == "level was not found" then 
-		msg.post("graphics", "noLevel")	
-	elseif wData.error then
-		msg.post("graphics", "noConnection")
+	if response.status == 200 and not wData.error then
+		yesConnection = true
+		nextLevelReady = true	
+	elseif  wData.error == "level was not found" then 
+		noLevel = true
+		nextLevelReady = true	
 	end
+
+	for k,v in pairs (wData.items[1].scrambled) do
+		nextBoard [tonumber(k)] = v
+	end
+	for k,v in pairs(wData.items[1].solved) do
+		nextSol[tonumber(k)] = v
+	end
+	nextLevelReady = true	
+end
+
+local function setBoard() 
+	if currentLevel == 1 then
+		blinkyPos[1]=74
+	elseif currentLevel == 2 then
+		blinkyPos[1]=69
+	else
+		blinkyPos[1]=111
+	end	
+	horizontal=true
+	vertical=false 
+	findHorizontalBlinky2(blinkyPos[1])
+	startGrid[1]=currentBoard
+	startGrid[2]=blinkyPos
+	for i,id in pairs(ids) do	
+		msg.post(id, "startGame", {letters=startGrid})	
+	end
+	msg.post("graphics", "writeLevel", {current=currentLevel})
+	local placeVal = tostring(currentLevel+1)
+	http.request("https://zeitnotentertainment.com/_functions/info?place="..placeVal, "GET", next_response)	
+	if apis["getInterstitialAdAsync"]  and canLoad and currentLevel ~=1 then
+		fbinstant.get_interstitial_ad(level_placement, function(self, ad_id, error)
+			if not error then
+				ad_id1 = ad_id
+				fbinstant.load_interstitial_ad(ad_id1, function(self, success, error)
+					if success then
+						canShow = true
+						canLoad = false
+					end
+				end)
+			end
+		end)
+	end
+end
+
+local function updateBoard()
+	for k,v in pairs (currentBoard) do
+		currentBoard [k] = nil
+	end
+	for k,v in pairs (sol) do
+		sol [k] = nil
+	end
+	if nextLevelReady then
+		if  yesConnection then
+			msg.post("graphics", "new")
+			msg.post("graphics", "yesConnection")
+			for k,v in pairs (nextBoard) do
+				currentBoard [k] = v
+			end
+			for k,v in pairs (nextSol) do
+				sol [k] = v
+			end
+			currentLevel = currentLevel+1
+			setBoard()
+			for k,v in pairs (nextBoard) do
+				nextBoard [k] = nil
+			end
+			for k,v in pairs (nextSol) do
+				nextSol [k] = nil
+			end
+			local c = {}
+			local s = {}
+			for k,v in pairs(currentBoard) do 
+				c[tostring(k)] = currentBoard[k]
+			end
+			for k,v in pairs(sol) do 
+				s[tostring(k)] = sol[k]
+			end
+			fbinstant.set_player_data(zjson.encode({
+				currentf = c,
+				solf = s,
+				levelf = currentLevel,
+			}),function(self, success)
+			end)
+			yesConnection = false
+		elseif  noLevel then
+			msg.post("graphics", "noLevel")
+			noLevel = false
+		else
+			msg.post("graphics", "noConnection")
+		end		
+		nextLevelReady = false	
+	else
+		timer.delay(1, false, updateBoard)
+	end
+end
+local function start_response(self, id, response)
+	local wData = json.decode(response.response)
 	if response.status == 200 and not wData.error then
 		msg.post("graphics", "yesConnection")
+	elseif  wData.error == "level was not found" then 
+		msg.post("graphics", "noLevel")	
+	else
+		msg.post("graphics", "noConnection")
 	end
 	
 	for k,v in pairs (wData.items[1].scrambled) do
@@ -414,30 +505,97 @@ local function handle_response(self, id, response)
 	for k,v in pairs(wData.items[1].solved) do
 		sol[tonumber(k)] = v
 	end
-	currentLevel=wData.items[1].place
-
-	if currentLevel == 1 then
-		blinkyPos[1]=74
-	elseif currentLevel == 2 then
-		blinkyPos[1]=69
-	end
-		
-	if horizontal==true then
-		findHorizontalBlinky2(blinkyPos[1])
-	else
-		findVerticalBlinky2(blinkyPos[1])
-	end
-	
-	startGrid[1]=currentBoard
-	startGrid[2]=blinkyPos
-	for i,id in ipairs(ids) do	
-		msg.post(id, "startGame", {letters=startGrid})	
-	end
+	setBoard()
 end
 
+
+local function flip()
+	local swapInfo={}
+	swapInfo[1]=currentBoard
+	swapInfo[2]=blinkyPos	
+
+	local a = currentBoard[blinkyPos[1]]
+	local b = currentBoard[blinkyPos[2]] 
+
+	currentBoard[blinkyPos[1]] = b
+	currentBoard[blinkyPos[2]] = a
+
+	--ipairs breaks at nil
+	for i,id in ipairs(ids) do	
+		msg.post(id, "swap", {flip = swapInfo})	
+	end
+
+	if currentLevel == 1 then
+		msg.post("graphics", "handOff")	
+	end
+	local c = {}
+	local s = {}
+	for k,v in pairs(currentBoard) do 
+		c[tostring(k)] = currentBoard[k]
+	end
+	for k,v in pairs(sol) do 
+		s[tostring(k)] = sol[k]
+	end
+	fbinstant.set_player_data(zjson.encode({
+		currentf = c,
+		solf = s,
+		levelf = currentLevel,
+	}),function(self, success)
+	end)
+	
+	if tablesEquivalent(currentBoard,sol) then
+		msg.post("graphics","levelOver", {level = tostring(currentLevel)})
+		for i,id in ipairs(ids) do	
+			msg.post(id, "stop", {oldBlink = blinkyPos})	
+		end
+		msg.post("controller#complete", "play_sound")
+		horizontal=true
+	else
+		msg.post("controller#flip", "play_sound")
+	end
+
+end
+
+function initGame()
+	fbinstant.get_player_data(zjson.encode({"currentf","solf","levelf",}), function(self, data)
+		local data_f = json.decode(data)
+		local l = data_f.levelf
+		if l == nil then
+			local placeVal = tostring(currentLevel)
+			http.request("https://zeitnotentertainment.com/_functions/info?place="..placeVal, "GET", start_response)
+		else
+			for k,v in pairs (data_f.currentf) do
+				currentBoard [tonumber(k)] = v
+			end
+			for k,v in pairs(data_f.solf) do
+				sol[tonumber(k)] = v
+			end
+			currentLevel = tonumber(l)
+			msg.post("graphics", "writeLevel", {current=currentLevel})
+			msg.post("graphics", "yesConnection")
+			setBoard()
+			if tablesEquivalent(currentBoard,sol) then
+				msg.post("graphics","levelOver", {level = tostring(currentLevel)})
+				for i,id in ipairs(ids) do	
+					msg.post(id, "stop", {oldBlink = blinkyPos})	
+				end
+			end				
+		end		
+	end)
+end
+local function paused()
+	pause =1
+end
+
+
+
 function init(self)
-	http.request("https://zeitnotentertainment.com/_functions/info?place=1", "GET", handle_response)
-	math.randomseed(os.time())math.random()math.random()math.random()math.random()
+	fbinstant.initialize(function(self, success)
+		fbinstant.start_game(function(self, success)
+			fbinstant.on_pause(paused)
+		end)
+	end)
+
 	local tileY = 645
 	for i=1,11 do
 		local tileX = 60
@@ -450,16 +608,12 @@ function init(self)
 			tileX = tileX+96
 		end	
 		tileY = tileY+96
-	end		
-	msg.post("graphics", "writeLevel", {current=currentLevel})
-	msg.post(".", "acquire_input_focus")
+	end	
+	initGame()
+	math.randomseed(os.time())math.random()math.random()math.random()math.random()
+	msg.post(".", "acquire_input_focus")	
 end
 
-function final(self)
-	-- Add finalization code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
-end
 
 
 function on_message(self, message_id, message, sender)
@@ -501,6 +655,7 @@ function on_message(self, message_id, message, sender)
 				table.insert(keyset, i)
 			end
 		end
+	
 		math.random(#keyset) math.random(#keyset) math.random(#keyset)
 		local randomV = keyset[math.random(#keyset)]
 		clueInfo[3]=randomV
@@ -510,16 +665,45 @@ function on_message(self, message_id, message, sender)
 		--redundant,inited as empty
 		for i, v in pairs(keyset) do keyset[i] = nil end
 		math.random()
+	end
+	if message_id == playFlipSound then
 		msg.post("controller#flip", "play_sound")
 	end
 
 	if message_id == retry then 
-		http.request("https://zeitnotentertainment.com/_functions/info?place=0", "GET", handle_response)
+		for k,v in pairs (currentBoard) do
+			currentBoard [k] = nil
+		end
+		for k,v in pairs (sol) do
+			sol [k] = nil
+		end
+		initGame()
+	end
+	if message_id == share then
+		if screenshot.html5 then
+			screenshot.html5(function(self, base64_img)
+				local payload = zjson.encode({ intent="SHARE", image=base64_img,text="Think.Flip.Spell"})
+				fbinstant.share(payload,function(self,success)
+				end)
+			end)
+		end
+	end
+	if message_id == next then
+		for i,id in ipairs(ids) do	
+			msg.post(id, "clearBoard")	
+		end
+		if canShow then
+			fbinstant.show_interstitial_ad(ad_id1, function(self, success, error)
+				if success then
+					canShow = false
+					canLoad = true
+				end
+			end)
+		end
+		updateBoard()		
 	end
 	
-	
 end
-
 
 
 function on_input(self, action_id, action)

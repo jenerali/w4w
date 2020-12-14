@@ -217,7 +217,7 @@ nodes {
   }
   type: TYPE_TEXT
   blend_mode: BLEND_MODE_ALPHA
-  text: "#5"
+  text: ""
   font: "acmeRegular"
   id: "levels"
   xanchor: XANCHOR_NONE

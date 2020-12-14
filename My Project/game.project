@@ -8,16 +8,31 @@ shared_state = 1
 width = 1080
 height = 1920
 vsync = 0
+high_dpi = 1
 
 [android]
 input_method = HiddenInputField
 
 [project]
-title = Word 4 Word
+title = The Word Flip Puzzle
+dependencies = https://github.com/britzl/defold-screenshot/archive/master.zip,https://github.com/Bnabz/extension-fbinstant/archive/master.zip
+bundle_resources = my_bundle_resources
 
 [label]
 max_count = 128
 
 [render]
 clear_color_alpha = 1.0
+
+[html5]
+show_made_with_defold = 0
+show_fullscreen_button = 0
+scale_mode = fit
+htmlfile = /builtins/manifests/web/engine_template.html
+
+[native_extension]
+app_manifest = /generated.appmanifest
+
+[graphics]
+texture_profiles = /default.texture_profiles
 
