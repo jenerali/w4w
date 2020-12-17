@@ -682,7 +682,7 @@ function on_message(self, message_id, message, sender)
 	if message_id == share then
 		if screenshot.html5 then
 			screenshot.html5(function(self, base64_img)
-				local payload = zjson.encode({ intent="SHARE", image=base64_img,text="Think.Flip.Spell"})
+				local payload = zjson.encode({ intent="SHARE", image=base64_img,text="Think. Swap. Spell"})
 				fbinstant.share(payload,function(self,success)
 				end)
 			end)

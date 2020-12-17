@@ -32,23 +32,18 @@ local function nodeFade(node)
 
 end
 local function introAnim()
-	local x1 = 270
-	local x2 = 435
-	local x3 = 690
-	local y = 1820
+
 	msg.post("controller#controllerScript","startSound") 
-	gui.set_position(gui.get_node("titleA"), vmath.vector3(x1,y,0))
-	gui.set_position(gui.get_node("ord"), vmath.vector3(x2,y,0))
-	gui.set_position(gui.get_node("titleB"), vmath.vector3(x3,y,0))
-	gui.set_text(gui.get_node("titleA"), "W")
-	gui.set_text(gui.get_node("titleB"), "F")	
+	gui.set_text(gui.get_node("titleA"), "P")
+	gui.set_text(gui.get_node("titleB"), "L")	
 end
 
 function init(self)
 	local a = gui.get_node("titleA")
 	local b = gui.get_node("titleB")
-	local c = gui.get_node("ord")
-	local d = gui.get_node("lip")
+	local c = gui.get_node("swa")
+	local d = gui.get_node("spel")
+	local e = gui.get_node("N")
 	local hand = gui.get_node("hand")
 	local upToDate = gui.get_node("upToDate")
 	local tomorrow = gui.get_node("tomorrow")
@@ -71,6 +66,7 @@ function init(self)
 	nodeFade(b)
 	nodeFade(c)
 	nodeFade(d)
+	nodeFade(e)
 	gui.animate(a, "rotation.y", 360, gui.EASING_LINEAR, 0.5, 4, nil, gui.PLAYBACK_ONCE_FORWARD)
 	gui.animate(b, "rotation.y", 360, gui.EASING_LINEAR, 0.5, 4, introAnim, gui.PLAYBACK_ONCE_FORWARD)
 	msg.post(".", "acquire_input_focus")
