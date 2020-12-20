@@ -43,6 +43,7 @@ local level_placement = "426559372102433_446324906792546"
 local ad_id1 = " "
 local apis_json = fbinstant.get_supported_apis()
 local apis = json.decode(apis_json)
+local hasShortcut = false
 
 
 
@@ -550,6 +551,21 @@ local function flip()
 		end
 		msg.post("controller#complete", "play_sound")
 		horizontal=true
+		if currentLevel%3 == 0 and hasShortcut == false then
+			fbinstant.can_create_shortcut(function(self, success)
+				if success then 
+					fbinstant.create_shortcut(function(self, success)
+						if success then 
+							hasShortcut = true
+							fbinstant.set_player_data(zjson.encode({
+								shortcutf = hasShortcut	
+							}),function(self, success)
+							end)
+						end
+					end)
+				end	
+			end)
+		end
 	else
 		msg.post("controller#flip", "play_sound")
 	end
@@ -557,13 +573,14 @@ local function flip()
 end
 
 function initGame()
-	fbinstant.get_player_data(zjson.encode({"currentf","solf","levelf",}), function(self, data)
+	fbinstant.get_player_data(zjson.encode({"currentf","solf","levelf","shortcutf"}), function(self, data)
 		local data_f = json.decode(data)
 		local l = data_f.levelf
 		if l == nil then
 			local placeVal = tostring(currentLevel)
 			http.request("https://zeitnotentertainment.com/_functions/info?place="..placeVal, "GET", start_response)
 		else
+			hasShortcut = data_f.shortcutf
 			for k,v in pairs (data_f.currentf) do
 				currentBoard [tonumber(k)] = v
 			end

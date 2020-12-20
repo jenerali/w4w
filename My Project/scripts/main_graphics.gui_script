@@ -91,7 +91,7 @@ function on_message(self, message_id, message, sender)
 	local xBulb=1015
 	local yBulb=1750
 	local xAd=985
-	local yAd=1740
+	local yAd=1720
 
 	if message_id == new then
 		newLevel = true
